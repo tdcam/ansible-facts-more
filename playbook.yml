@@ -1,0 +1,93 @@
+---
+- name: Setting up web services including basic authentication
+  hosts: web
+  vars:
+    firewall_pkg: firewalld
+    firewall_svc: firewalld
+    web_pkg: httpd
+    web_svc: httpd
+    ssl_pkg: mod_ssl
+    httpdconf_src: files/httpd.conf
+    httpdconf_dest: /etc/httpd/conf/httpd.conf
+    htaccess_src: files/.htaccess
+    secrets_dir: /etc/httpd/secrets
+    secrets_src: files/htpasswd
+    secrets_dest: "{{ secrets_dir }}/htpasswd"
+    web_root: /var/www/html
+  tasks:
+    - name: Install required packages
+      ansible.builtin.dnf:
+        name: 
+          - "{{ firewall_pkg }}" 
+          - "{{ web_pkg }}"
+          - "{{ ssl_pkg }}"
+        state: latest
+    - name: Copy {{ httpdconf_src }} to {{ httpdconf_dest }}
+      ansible.builtin.copy:
+        src: "{{ httpdconf_src }}"
+        dest: "{{ httpdconf_dest }}"
+        owner: root
+        group: root
+        mode: 0644
+    - name: Create {{ secrets_dir }}
+      ansible.builtin.file:
+        path: "{{ secrets_dir }}"
+        state: directory
+        owner: apache
+        group: apache
+        mode: 0500
+    - name: Copy {{ secrets_src }} to {{ secrets_dir }}
+      ansible.builtin.copy:
+        src: "{{ secrets_src }}"
+        dest: "{{ secrets_dir }}"
+        owner: apache
+        group: apache
+        mode: 0400
+    - name: Copy {{ htaccess_src }} to  {{ web_root }}
+      ansible.builtin.copy:
+        src: "{{ htaccess_src }}"
+        dest: "{{ web_root }}/.htaccess"
+        owner: apache
+        group: apache
+        mode: 0400
+    - name: Create {{ web_root }}/index.html using Ansible facts
+      ansible.builtin.copy:
+        content: "This is {{ ansible_facts['fqdn'] }} ({{ ansible_facts['default_ipv4']['address'] }}).\n"
+        dest: "{{ web_root }}/index.html"
+    - name: Start {{ firewall_svc }}
+      ansible.builtin.service:
+        name: "{{ firewall_svc }}"
+        state: started
+        enabled: yes
+    - name: Open up https
+      ansible.posix.firewalld:
+        service: https
+        state: enabled
+        immediate: true
+        permanent: true
+    - name: Start the trusty {{ web_svc }}
+      ansible.builtin.service:
+        name: "{{ web_svc }}"
+        state: started
+        enabled: true
+
+- name: Test authentication
+  hosts: localhost
+  become: false
+  vars:
+    web_user: guest
+  vars_files:
+    - vars/secret.yml
+  tasks:
+    - name: Grab content from web-dev using basic authentication
+      ansible.builtin.uri:
+        url: https://web-dev.aus.sparksoftcorp.io
+        validate_certs: false
+        force_basic_auth: true
+        user: "{{ web_user }}"
+        password: "{{ web_pass }}"
+        return_content: true
+        status_code: 200
+      register: auth_test
+    - ansible.builtin.debug:
+        var: auth_test.content
