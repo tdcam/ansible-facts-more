@@ -1,0 +1,36 @@
+---
+- name: Remove packages and firewall rules.
+  hosts: web
+  vars:
+    firewall_svc: firewalld
+    web_pkg: httpd
+    web_svc: httpd
+    ssl_pkg: mod_ssl
+    httpdconf_src: files/httpd.conf
+    httpdconf_dest: /etc/httpd/conf/httpd.conf
+    htaccess_src: files/.htaccess
+    secrets_dir: /etc/httpd/secrets
+    secrets_src: files/htpasswd
+    secrets_dest: "{{ secrets_dir }}/htpasswd"
+    web_root: /var/www/html
+  tasks:
+    - name: Remove "{{ web_pkg  }}" and "{{ ssl_pkg  }}"
+      ansible.builtin.dnf:
+        name:
+          - "{{ web_pkg  }}"
+          - "{{ ssl_pkg  }}"
+        autoremove: true
+    - name: Remove the firewall rules.
+      ansible.posix.firewalld:
+        service: https
+        state: disabled
+        immediate: true
+        permanent: true
+    - name: remove the old files in /etc/httpd
+      ansible.builtin.file:
+        path: /etc/httpd
+        state: absent
+    - name: remove the fold files in /var/www
+      ansible.builtin.file:
+        path: /var/www
+        state: absent

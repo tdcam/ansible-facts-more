@@ -91,3 +91,27 @@
       register: auth_test
     - ansible.builtin.debug:
         var: auth_test.content
+    - name: Grab content from web-qa using basic authentication
+      ansible.builtin.uri:
+        url: https://web-qa.aus.sparksoftcorp.io
+        validate_certs: false
+        force_basic_auth: true
+        user: "{{ web_user }}"
+        password: "{{ web_pass }}"
+        return_content: true
+        status_code: 200
+      register: auth_test
+    - ansible.builtin.debug:
+        var: auth_test.content
+    - name: Grab content from web-prod using basic authentication
+      ansible.builtin.uri:
+        url: https://web-prod.aus.sparksoftcorp.io
+        validate_certs: false
+        force_basic_auth: true
+        user: "{{ web_user }}"
+        password: "{{ web_pass }}"
+        return_content: true
+        status_code: 200
+      register: auth_test
+    - ansible.builtin.debug:
+        var: auth_test.content
